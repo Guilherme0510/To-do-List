@@ -9,11 +9,21 @@ import {
   faStar,
   faSun,
   faTable,
+  faTrash,
   faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { imagens } from "../assets/imagens";
-import { db } from '../../src/firebaseConfig';
-import { collection, addDoc, getDocs, setDoc, getDoc, where, query } from "firebase/firestore";
+import { db } from "../../src/firebaseConfig";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  setDoc,
+  getDoc,
+  where,
+  query,
+  deleteDoc,
+} from "firebase/firestore";
 import { useAuth } from "../Context/AuthContext";
 import { doc } from "firebase/firestore";
 
@@ -21,12 +31,12 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
   const [navbar, setNavbar] = useState(false);
   const [listas, setListas] = useState([]);
   const [novaLista, setNovaLista] = useState("");
-  const [showInput, setShowInput] = useState(false); 
+  const [showInput, setShowInput] = useState(false);
   const { user } = useAuth();
 
   const [infoPerfil, setInfoPerfil] = useState({
     nome: "",
-    email: ""
+    email: "",
   });
 
   useEffect(() => {
@@ -38,16 +48,16 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
         if (docSnap.exists()) {
           setInfoPerfil({
             nome: docSnap.data().nome || "Usuário",
-            email: docSnap.data().email || user.email
+            email: docSnap.data().email || user.email,
           });
         } else {
           await setDoc(docRef, {
             nome: user.displayName || "Usuário",
-            email: user.email
+            email: user.email,
           });
           setInfoPerfil({
             nome: user.displayName || "Usuário",
-            email: user.email
+            email: user.email,
           });
         }
       }
@@ -65,13 +75,16 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
       const querySnapshot = await getDocs(
         query(collection(db, "listas"), where("userId", "==", user.uid))
       );
-      const listasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const listasData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setListas(listasData);
     } catch (error) {
       console.error("Erro ao buscar listas: ", error);
     }
   };
-  
+
   useEffect(() => {
     fetchListas();
   }, [user]);
@@ -82,13 +95,23 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
       await addDoc(collection(db, "listas"), {
         nome: novaLista,
         criadaEm: new Date(),
-        userId: user.uid
+        userId: user.uid,
       });
       setNovaLista("");
       setShowInput(false);
       fetchListas();
     } catch (error) {
       console.error("Erro ao adicionar lista: ", error);
+    }
+  };
+
+  const handleDeleteList = async (listaId) => {
+    try {
+      await deleteDoc(doc(db, "listas", listaId));
+      setListas((prevListas) => prevListas.filter((lista) => lista.id !== listaId));
+      setSelectedList(null);
+    } catch (error) {
+      console.error("Erro ao deletar lista: ", error);
     }
   };
 
@@ -165,11 +188,18 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
                 {listas.map((lista) => (
                   <li
                     key={lista.id}
-                    className="h-9 flex items-center gap-4 p-2 rounded-lg cursor-pointer hover:bg-gray-500"
-                    onClick={() => handleSelectList(lista)}
+                    className="h-9 flex items-center gap-4 p-2 rounded-lg cursor-pointer hover:bg-gray-500 justify-between"
                   >
-                    <FontAwesomeIcon icon={faList} color="#fff" />
-                    {lista.nome}
+                    <div className="flex items-center gap-4" onClick={() => handleSelectList(lista)}>
+                      <FontAwesomeIcon icon={faList} color="#fff" />
+                      {lista.nome}
+                    </div>
+                    <FontAwesomeIcon
+                      icon={faTrash}
+                      color="#ff6b6b"
+                      className="cursor-pointer hover:text-red-700"
+                      onClick={() => handleDeleteList(lista.id)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -204,6 +234,7 @@ export const Navbar = ({ sidebar, setSidebar, setSelectedList }) => {
             </div>
           </div>
         )}
+
 
         {!navbar && (
           <div className="h-screen flex flex-col justify-center items-center">
